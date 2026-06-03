@@ -1,44 +1,69 @@
-# Python OR-Tools mTSP: 応急危険度判定シミュレーション
+# 応急危険度判定 mTSP シミュレーター
 
-OR-Toolsを使って、応急危険度判定を題材にした Multiple Traveling Salesman Problem, mTSP を解くハンズオン用コードです。
+Python と OR-Tools を使って、複数の判定士が複数の建物を分担して巡回する
+mTSP（Multiple Traveling Salesman Problem）を解くハンズオン用コードです。
 
-- 0番地点を災害対策本部として扱います。
-- 1〜20番地点を判定対象建物としてランダム生成します。
-- 3人の判定士が本部から出発し、本部へ戻ります。
-- 全ての建物を必ず1回訪問します。
-- 最長ルートを短くする設定により、担当の偏りを抑えます。
-- matplotlibで経路を可視化します。
-- 実行時間も計測します。
+## できること
 
-## セットアップ
+- 0番地点を災害対策本部として固定
+- 1番以降の地点を判定対象建物としてランダム生成
+- 複数の判定士が本部から出発し、本部へ戻るルートを計算
+- 全ての建物を必ず1回訪問
+- 最長ルートを短くすることで担当の偏りを抑制
+- matplotlibで経路を可視化
+- 実行時間を計測
 
-Python 3.10以上を推奨します。
+## ファイル
+
+- `mtsp_emergency_assessment.py`
+  - 1ファイルで実行できるCLI版です。
+  - 地点生成、距離行列作成、OR-Tools最適化、結果抽出の実行時間を表示します。
+- `mtsp_emergency_inspection.py`
+  - GUIでパラメータを変更できる版です。
+- `requirements.txt`
+  - 必要なPythonパッケージ一覧です。
+
+## インストール
+
+Windows の PowerShell またはコマンドプロンプトで実行します。
 
 ```powershell
-pip install ortools matplotlib
+py -m pip install -r requirements.txt
 ```
 
-Windowsで複数のPythonが入っている場合は、次の実行方法も使えます。
+`py` が使えない場合は、次を試してください。
 
 ```powershell
-py -m pip install ortools matplotlib
+python -m pip install -r requirements.txt
 ```
 
-## 実行
-
-```powershell
-python mtsp_emergency_assessment.py
-```
-
-または:
+## CLI版の実行
 
 ```powershell
 py mtsp_emergency_assessment.py
 ```
 
+または:
+
+```powershell
+python mtsp_emergency_assessment.py
+```
+
+## GUI版の実行
+
+```powershell
+py mtsp_emergency_inspection.py
+```
+
+または:
+
+```powershell
+python mtsp_emergency_inspection.py
+```
+
 ## 実験設定の変更
 
-`mtsp_emergency_assessment.py` の冒頭付近にある定数を変更します。
+CLI版では、`mtsp_emergency_assessment.py` の冒頭付近にある定数を変更します。
 
 ```python
 NUM_BUILDINGS = 20
@@ -52,10 +77,21 @@ SOLVER_TIME_LIMIT_SECONDS = 10
 SOLVER_TIME_LIMIT_SECONDS = 1800
 ```
 
-## 発展案
+GUI版では、画面上で次のパラメータを変更できます。
 
+- 乱数シード
+- 判定対象建物数
+- 判定士数
+- 探索時間
+- 偏り抑制係数
+- 経路図を表示するかどうか
+
+## 研究へ発展させるための改造ポイント
+
+- 実道路ネットワークを使った距離行列に変更する
 - Google Maps Platformなどを使い、直線距離ではなく道路距離を使う
-- 建物ごとに危険度、調査時間、優先度を設定する
-- 判定士ごとの移動速度や経験値を設定する
-- 道路閉塞、担当区域、帰着時刻制約を加える
-- GISデータと連携して実市街地に近いシミュレーションにする
+- 道路閉塞や橋梁被害を通行不可・高コストとして反映する
+- 建物ごとの危険度、判定所要時間、優先度を追加する
+- 判定士ごとの経験差、移動速度、担当可能エリアを追加する
+- GISデータや避難所・公共施設データと接続する
+- 時間窓制約を入れて、一定時刻までに優先建物を回るモデルにする
