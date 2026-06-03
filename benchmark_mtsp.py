@@ -57,6 +57,10 @@ BENCHMARK_FIELDNAMES = [
     "solve_time_seconds",
     "extract_time_seconds",
     "total_time_seconds",
+    "setup_time_seconds",
+    "non_solver_time_seconds",
+    "solve_overrun_seconds",
+    "solve_time_ratio",
     "total_distance",
     "max_distance",
     "min_distance",
@@ -172,6 +176,18 @@ def run_single_case(
     except Exception as exc:
         row["error"] = str(exc)
     finally:
+        generate_time = float(row.get("generate_time_seconds", 0) or 0)
+        matrix_time = float(row.get("matrix_time_seconds", 0) or 0)
+        solve_time = float(row.get("solve_time_seconds", 0) or 0)
+        extract_time = float(row.get("extract_time_seconds", 0) or 0)
+
+        row["setup_time_seconds"] = generate_time + matrix_time
+        row["non_solver_time_seconds"] = generate_time + matrix_time + extract_time
+        row["solve_overrun_seconds"] = solve_time - time_limit_seconds
+        row["solve_time_ratio"] = (
+            solve_time / time_limit_seconds if time_limit_seconds else ""
+        )
+
         if trace_memory:
             current_bytes, peak_bytes = tracemalloc.get_traced_memory()
             tracemalloc.stop()
@@ -281,7 +297,8 @@ def main() -> None:
                     "  solved: "
                     f"max_distance={row.get('max_distance')}, "
                     f"imbalance={float(row.get('imbalance_ratio', 0)):.3f}, "
-                    f"total_time={float(row.get('total_time_seconds', 0)):.3f}s",
+                    f"non_solver_time={float(row.get('non_solver_time_seconds', 0)):.3f}s, "
+                    f"wall_time={float(row.get('total_time_seconds', 0)):.3f}s",
                     flush=True,
                 )
             else:

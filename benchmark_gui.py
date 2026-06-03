@@ -387,7 +387,8 @@ class BenchmarkGui(tk.Tk):
                 f"seed={row.get('seed')} "
                 f"max_distance={row.get('max_distance')} "
                 f"imbalance={float(row.get('imbalance_ratio', 0)):.3f} "
-                f"total_time={float(row.get('total_time_seconds', 0)):.3f}s\n"
+                f"non_solver={float(row.get('non_solver_time_seconds', 0)):.3f}s "
+                f"wall={float(row.get('total_time_seconds', 0)):.3f}s\n"
             )
         else:
             text = (
