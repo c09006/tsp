@@ -44,7 +44,10 @@ README風メモ
 """
 
 import math
+import queue
 import random
+import threading
+import time
 import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
 
@@ -282,6 +285,19 @@ def build_routes_report(routes):
     return "\n".join(lines)
 
 
+def build_timing_report(timings):
+    """処理ごとの実行時間を、表示用テキストとして作成する。"""
+    lines = []
+    lines.append("")
+    lines.append("=== 実行時間 ===")
+    lines.append(f"地点生成        : {timings['generate_locations']:.3f} 秒")
+    lines.append(f"距離行列作成    : {timings['create_distance_matrix']:.3f} 秒")
+    lines.append(f"OR-Tools最適化  : {timings['solve_mtsp']:.3f} 秒")
+    lines.append(f"結果抽出        : {timings['extract_routes']:.3f} 秒")
+    lines.append(f"描画前までの合計: {timings['total_before_plot']:.3f} 秒")
+    return "\n".join(lines)
+
+
 def print_routes(routes):
     """判定士ごとの担当ルートと移動距離を表示する。"""
     print("\n" + build_routes_report(routes))
@@ -395,6 +411,8 @@ class MtspGui(tk.Tk):
         self.time_limit_var = tk.StringVar(value=str(TIME_LIMIT_SECONDS))
         self.span_cost_var = tk.StringVar(value=str(SPAN_COST_COEFFICIENT))
         self.show_plot_var = tk.BooleanVar(value=True)
+        self.status_var = tk.StringVar(value="待機中")
+        self.progress_queue = queue.Queue()
 
         self._build_widgets()
 
@@ -422,11 +440,24 @@ class MtspGui(tk.Tk):
         button_frame = ttk.Frame(root_frame)
         button_frame.pack(fill=tk.X, pady=12)
 
-        run_button = ttk.Button(button_frame, text="ルートを計算", command=self.run_solver)
-        run_button.pack(side=tk.LEFT)
+        self.run_button = ttk.Button(button_frame, text="ルートを計算", command=self.run_solver)
+        self.run_button.pack(side=tk.LEFT)
 
-        reset_button = ttk.Button(button_frame, text="初期値に戻す", command=self.reset_defaults)
-        reset_button.pack(side=tk.LEFT, padx=8)
+        self.reset_button = ttk.Button(button_frame, text="初期値に戻す", command=self.reset_defaults)
+        self.reset_button.pack(side=tk.LEFT, padx=8)
+
+        progress_frame = ttk.Frame(root_frame)
+        progress_frame.pack(fill=tk.X, pady=(0, 12))
+
+        ttk.Label(progress_frame, textvariable=self.status_var).pack(anchor=tk.W)
+
+        self.progress_bar = ttk.Progressbar(
+            progress_frame,
+            mode="determinate",
+            maximum=100,
+            value=0,
+        )
+        self.progress_bar.pack(fill=tk.X, pady=(4, 0))
 
         output_frame = ttk.LabelFrame(root_frame, text="実行結果", padding=8)
         output_frame.pack(fill=tk.BOTH, expand=True)
@@ -497,40 +528,165 @@ class MtspGui(tk.Tk):
             messagebox.showerror("入力エラー", str(exc))
             return
 
-        self._write_output("計算中です...")
-        self.update_idletasks()
+        params = {
+            "seed": seed,
+            "num_buildings": num_buildings,
+            "num_inspectors": num_inspectors,
+            "time_limit_seconds": time_limit_seconds,
+            "span_cost_coefficient": span_cost_coefficient,
+            "show_plot": self.show_plot_var.get(),
+        }
 
-        locations = generate_locations(num_buildings, seed)
-        distance_matrix = create_distance_matrix(locations)
+        self._set_running(True)
+        self._write_output("計算を開始しました。進行状況は上のバーで確認できます。")
+        self._update_progress("地点生成の準備中...", 0)
 
-        manager, routing, solution = solve_mtsp(
-            distance_matrix,
-            num_inspectors,
-            DEPOT_INDEX,
-            time_limit_seconds,
-            span_cost_coefficient,
+        while not self.progress_queue.empty():
+            self.progress_queue.get_nowait()
+
+        worker = threading.Thread(
+            target=self._run_solver_worker,
+            args=(params,),
+            daemon=True,
         )
+        worker.start()
+        self.after(100, self._poll_progress_queue)
 
-        if solution is None:
-            messagebox.showwarning("結果", "解が見つかりませんでした。設定値や制約を見直してください。")
-            self._write_output("解が見つかりませんでした。")
-            return
+    def _run_solver_worker(self, params):
+        """重い計算をGUIとは別スレッドで実行する。"""
+        timings = {}
+        total_start = time.perf_counter()
 
-        routes = extract_routes(manager, routing, solution, num_inspectors)
-        report = build_routes_report(routes)
+        try:
+            self.progress_queue.put(("progress", "地点を生成しています...", 10))
+            start = time.perf_counter()
+            locations = generate_locations(params["num_buildings"], params["seed"])
+            timings["generate_locations"] = time.perf_counter() - start
 
-        parameter_report = (
-            f"乱数シード      : {seed}\n"
-            f"判定対象建物数  : {num_buildings}\n"
-            f"判定士数        : {num_inspectors}\n"
-            f"探索時間（秒）  : {time_limit_seconds}\n"
-            f"偏り抑制係数    : {span_cost_coefficient}\n\n"
-        )
+            self.progress_queue.put(("progress", "距離行列を作成しています...", 25))
+            start = time.perf_counter()
+            distance_matrix = create_distance_matrix(locations)
+            timings["create_distance_matrix"] = time.perf_counter() - start
 
-        self._write_output(parameter_report + report)
+            self.progress_queue.put(("solve_start", "OR-Toolsで最適化しています..."))
+            start = time.perf_counter()
+            manager, routing, solution = solve_mtsp(
+                distance_matrix,
+                params["num_inspectors"],
+                DEPOT_INDEX,
+                params["time_limit_seconds"],
+                params["span_cost_coefficient"],
+            )
+            timings["solve_mtsp"] = time.perf_counter() - start
 
-        if self.show_plot_var.get():
-            plot_routes(locations, routes)
+            if solution is None:
+                self.progress_queue.put(("no_solution", timings))
+                return
+
+            self.progress_queue.put(("solve_done", "結果を取り出しています...", 80))
+            start = time.perf_counter()
+            routes = extract_routes(
+                manager,
+                routing,
+                solution,
+                params["num_inspectors"],
+            )
+            timings["extract_routes"] = time.perf_counter() - start
+            timings["total_before_plot"] = time.perf_counter() - total_start
+
+            report = build_routes_report(routes)
+            timing_report = build_timing_report(timings)
+
+            parameter_report = (
+                f"乱数シード      : {params['seed']}\n"
+                f"判定対象建物数  : {params['num_buildings']}\n"
+                f"判定士数        : {params['num_inspectors']}\n"
+                f"探索時間（秒）  : {params['time_limit_seconds']}\n"
+                f"偏り抑制係数    : {params['span_cost_coefficient']}\n\n"
+            )
+
+            self.progress_queue.put(
+                (
+                    "done",
+                    {
+                        "text": parameter_report + report + timing_report,
+                        "locations": locations,
+                        "routes": routes,
+                        "show_plot": params["show_plot"],
+                    },
+                )
+            )
+        except Exception as exc:
+            self.progress_queue.put(("error", str(exc)))
+
+    def _poll_progress_queue(self):
+        """別スレッドから届いた進捗・結果をGUIへ反映する。"""
+        try:
+            while True:
+                message = self.progress_queue.get_nowait()
+                message_type = message[0]
+
+                if message_type == "progress":
+                    _, text, value = message
+                    self._update_progress(text, value)
+
+                elif message_type == "solve_start":
+                    _, text = message
+                    self.status_var.set(text)
+                    self.progress_bar.configure(mode="indeterminate")
+                    self.progress_bar.start(12)
+
+                elif message_type == "solve_done":
+                    _, text, value = message
+                    self.progress_bar.stop()
+                    self.progress_bar.configure(mode="determinate", value=value)
+                    self.status_var.set(text)
+
+                elif message_type == "no_solution":
+                    self.progress_bar.stop()
+                    self.progress_bar.configure(mode="determinate", value=0)
+                    self.status_var.set("解が見つかりませんでした")
+                    self._set_running(False)
+                    messagebox.showwarning("結果", "解が見つかりませんでした。設定値や制約を見直してください。")
+                    self._write_output("解が見つかりませんでした。")
+                    return
+
+                elif message_type == "error":
+                    _, error_text = message
+                    self.progress_bar.stop()
+                    self.progress_bar.configure(mode="determinate", value=0)
+                    self.status_var.set("エラーが発生しました")
+                    self._set_running(False)
+                    messagebox.showerror("エラー", error_text)
+                    self._write_output(f"エラーが発生しました。\n\n{error_text}")
+                    return
+
+                elif message_type == "done":
+                    _, payload = message
+                    self.progress_bar.stop()
+                    self.progress_bar.configure(mode="determinate", value=100)
+                    self.status_var.set("完了しました")
+                    self._write_output(payload["text"])
+                    self._set_running(False)
+
+                    if payload["show_plot"]:
+                        plot_routes(payload["locations"], payload["routes"])
+                    return
+        except queue.Empty:
+            pass
+
+        self.after(100, self._poll_progress_queue)
+
+    def _update_progress(self, text, value):
+        """進捗ラベルとバーを更新する。"""
+        self.status_var.set(text)
+        self.progress_bar.configure(mode="determinate", value=value)
+
+    def _set_running(self, is_running):
+        """計算中にボタンを押せないようにする。"""
+        state = tk.DISABLED if is_running else tk.NORMAL
+        self.run_button.configure(state=state)
+        self.reset_button.configure(state=state)
 
     def reset_defaults(self):
         """入力値を初期値に戻す。"""
@@ -540,6 +696,9 @@ class MtspGui(tk.Tk):
         self.time_limit_var.set(str(TIME_LIMIT_SECONDS))
         self.span_cost_var.set(str(SPAN_COST_COEFFICIENT))
         self.show_plot_var.set(True)
+        self.status_var.set("待機中")
+        self.progress_bar.stop()
+        self.progress_bar.configure(mode="determinate", value=0)
 
     def _write_output(self, text):
         """結果表示欄を書き換える。"""
