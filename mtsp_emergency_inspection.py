@@ -65,6 +65,7 @@ NUM_INSPECTORS = 3
 DEPOT_INDEX = 0
 TIME_LIMIT_SECONDS = 10
 SPAN_COST_COEFFICIENT = 100
+MAX_BUILDINGS_FOR_GUI = 2000
 
 # matplotlibのフォント設定です。
 # WindowsならMeiryoが入っていることが多いため、日本語表示用に指定します。
@@ -504,7 +505,7 @@ class MtspGui(tk.Tk):
                 self.buildings_var,
                 "判定対象建物数",
                 minimum=1,
-                maximum=200,
+                maximum=MAX_BUILDINGS_FOR_GUI,
             )
             num_inspectors = self._read_positive_int(
                 self.inspectors_var,
