@@ -44,6 +44,31 @@ DEFAULT_INSPECTORS = [3, 5, 10]
 DEFAULT_TIME_LIMITS = [10, 30]
 DEFAULT_SEEDS = [42]
 DEFAULT_OUTPUT = "benchmark_results.csv"
+BENCHMARK_FIELDNAMES = [
+    "num_buildings",
+    "num_locations",
+    "num_inspectors",
+    "time_limit_seconds",
+    "seed",
+    "span_cost_coefficient",
+    "solution_found",
+    "generate_time_seconds",
+    "matrix_time_seconds",
+    "solve_time_seconds",
+    "extract_time_seconds",
+    "total_time_seconds",
+    "total_distance",
+    "max_distance",
+    "min_distance",
+    "avg_distance",
+    "imbalance_ratio",
+    "max_buildings_per_inspector",
+    "min_buildings_per_inspector",
+    "avg_buildings_per_inspector",
+    "tracemalloc_current_mb",
+    "tracemalloc_peak_mb",
+    "error",
+]
 
 
 def positive_int(value: str) -> int:
@@ -224,36 +249,10 @@ def main() -> None:
         )
     )
 
-    fieldnames = [
-        "num_buildings",
-        "num_locations",
-        "num_inspectors",
-        "time_limit_seconds",
-        "seed",
-        "span_cost_coefficient",
-        "solution_found",
-        "generate_time_seconds",
-        "matrix_time_seconds",
-        "solve_time_seconds",
-        "extract_time_seconds",
-        "total_time_seconds",
-        "total_distance",
-        "max_distance",
-        "min_distance",
-        "avg_distance",
-        "imbalance_ratio",
-        "max_buildings_per_inspector",
-        "min_buildings_per_inspector",
-        "avg_buildings_per_inspector",
-        "tracemalloc_current_mb",
-        "tracemalloc_peak_mb",
-        "error",
-    ]
-
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     with args.output.open("w", newline="", encoding="utf-8-sig") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer = csv.DictWriter(csv_file, fieldnames=BENCHMARK_FIELDNAMES)
         writer.writeheader()
 
         for case_index, (buildings, inspectors, time_limit, seed) in enumerate(

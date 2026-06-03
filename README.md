@@ -22,6 +22,8 @@ mTSP（Multiple Traveling Salesman Problem）を解くハンズオン用コー�
   - GUIでパラメータを変更できる版です。
 - `benchmark_mtsp.py`
   - 複数条件をまとめて実行し、性能指標をCSV保存するベンチマーク版です。
+- `benchmark_gui.py`
+  - ベンチマーク条件を画面上で指定できるGUI版です。
 - `requirements.txt`
   - 必要なPythonパッケージ一覧です。
 
@@ -94,6 +96,25 @@ CSVには、次のような指標が出力されます。
 ```powershell
 py benchmark_mtsp.py --buildings 500 1000 --inspectors 5 10 --time-limits 10 --trace-memory
 ```
+
+## ベンチマークGUI版の実行
+
+ベンチマーク条件を画面上で入力して実行できます。
+
+```powershell
+py benchmark_gui.py
+```
+
+入力欄には、複数値をスペース、カンマ、改行区切りで入力できます。
+
+```text
+建物数: 200 500 1000
+判定士数: 3 5 10
+探索時間: 10 30 60
+乱数シード: 42 43 44
+```
+
+実行中は進捗バーとログが更新され、各ケースの結果がCSVに保存されます。
 
 ## 実験設定の変更
 
