@@ -20,6 +20,8 @@ mTSP（Multiple Traveling Salesman Problem）を解くハンズオン用コー�
   - 地点生成、距離行列作成、OR-Tools最適化、結果抽出の実行時間を表示します。
 - `mtsp_emergency_inspection.py`
   - GUIでパラメータを変更できる版です。
+- `benchmark_mtsp.py`
+  - 複数条件をまとめて実行し、性能指標をCSV保存するベンチマーク版です。
 - `requirements.txt`
   - 必要なPythonパッケージ一覧です。
 
@@ -59,6 +61,38 @@ py mtsp_emergency_inspection.py
 
 ```powershell
 python mtsp_emergency_inspection.py
+```
+
+## ベンチマーク版の実行
+
+描画なしで複数条件をまとめて実行し、CSVに保存します。
+
+```powershell
+py benchmark_mtsp.py
+```
+
+条件を指定する例です。
+
+```powershell
+py benchmark_mtsp.py --buildings 200 500 1000 --inspectors 3 5 10 --time-limits 10 30 60 --seeds 42 43 44 --output benchmark_results.csv
+```
+
+CSVには、次のような指標が出力されます。
+
+- 解が見つかったか
+- 距離行列作成時間
+- OR-Tools最適化時間
+- 合計移動距離
+- 最長ルート距離
+- 平均ルート距離
+- 偏り率（最長ルート距離 / 平均ルート距離）
+- 判定士ごとの担当建物数
+- Python側のピークメモリ使用量（`--trace-memory` 指定時）
+
+メモリ計測も行う場合は次のように実行します。大規模ケースでは計測自体が遅くなることがあります。
+
+```powershell
+py benchmark_mtsp.py --buildings 500 1000 --inspectors 5 10 --time-limits 10 --trace-memory
 ```
 
 ## 実験設定の変更
